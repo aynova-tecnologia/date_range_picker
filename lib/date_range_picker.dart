@@ -621,12 +621,10 @@ class _MonthPickerState extends State<MonthPicker> with SingleTickerProviderStat
     super.didUpdateWidget(oldWidget);
     if (widget.selectedLastDate == null) {
       final int monthPage = _monthDelta(widget.firstDate, widget.selectedFirstDate);
-      _dayPickerController = new PageController(initialPage: monthPage);
       _handleMonthPageChanged(monthPage);
     } else if (oldWidget.selectedLastDate == null ||
         widget.selectedLastDate != oldWidget.selectedLastDate) {
       final int monthPage = _monthDelta(widget.firstDate, widget.selectedLastDate!);
-      _dayPickerController = new PageController(initialPage: monthPage);
       _handleMonthPageChanged(monthPage);
     }
   }
@@ -688,7 +686,6 @@ class _MonthPickerState extends State<MonthPicker> with SingleTickerProviderStat
   void _handleNextMonth() {
     if (!_isDisplayingLastMonth && _nextMonthDate != null) {
       SemanticsService.announce(localizations.formatMonthYear(_nextMonthDate!), textDirection);
-      print('_handleNextMonth()');
       _dayPickerController.nextPage(duration: _kMonthScrollDuration, curve: Curves.ease);
     }
   }
@@ -719,17 +716,19 @@ class _MonthPickerState extends State<MonthPicker> with SingleTickerProviderStat
 
   void _handleMonthPageChanged(int monthPage) {
     setState(() {
+      // update the controller to keep up with current page's setting
+      // otherwise there'll be a bug where the page "snaps" back to previous state
+      // after just briefly started animating forward/backward
+      // -- there must be something wrong, this is just a workaround, FIXME
+      _dayPickerController = new PageController(initialPage: monthPage);
       _previousMonthDate = _addMonthsToMonthDate(widget.firstDate, monthPage - 1);
       _currentDisplayedMonthDate = _addMonthsToMonthDate(widget.firstDate, monthPage);
       _nextMonthDate = _addMonthsToMonthDate(widget.firstDate, monthPage + 1);
-      print('_previousMonthDate $_previousMonthDate');
-      print('_nextMonthDate $_nextMonthDate');
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    print('======rebuild======');
     return new SizedBox(
       width: _kMonthPickerPortraitWidth,
       height: _kMaxDayPickerHeight,
@@ -755,7 +754,7 @@ class _MonthPickerState extends State<MonthPicker> with SingleTickerProviderStat
                   scrollDirection: Axis.horizontal,
                   itemCount: _monthDelta(widget.firstDate, widget.lastDate) + 1,
                   itemBuilder: _buildItems,
-                  onPageChanged: _handleMonthPageChanged, //FIXME: this callback is called too soon causing setState() to conflict with page change animation
+                  onPageChanged: _handleMonthPageChanged,
                 ),
               ),
             ),
@@ -801,7 +800,6 @@ class _MonthPickerState extends State<MonthPicker> with SingleTickerProviderStat
 
   @override
   void dispose() {
-    print('--------dispose()--------');
     _timer?.cancel();
     _dayPickerController.dispose();
     super.dispose();
