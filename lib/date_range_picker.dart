@@ -688,6 +688,7 @@ class _MonthPickerState extends State<MonthPicker> with SingleTickerProviderStat
   void _handleNextMonth() {
     if (!_isDisplayingLastMonth && _nextMonthDate != null) {
       SemanticsService.announce(localizations.formatMonthYear(_nextMonthDate!), textDirection);
+      print('_handleNextMonth()');
       _dayPickerController.nextPage(duration: _kMonthScrollDuration, curve: Curves.ease);
     }
   }
@@ -721,11 +722,14 @@ class _MonthPickerState extends State<MonthPicker> with SingleTickerProviderStat
       _previousMonthDate = _addMonthsToMonthDate(widget.firstDate, monthPage - 1);
       _currentDisplayedMonthDate = _addMonthsToMonthDate(widget.firstDate, monthPage);
       _nextMonthDate = _addMonthsToMonthDate(widget.firstDate, monthPage + 1);
+      print('_previousMonthDate $_previousMonthDate');
+      print('_nextMonthDate $_nextMonthDate');
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    print('======rebuild======');
     return new SizedBox(
       width: _kMonthPickerPortraitWidth,
       height: _kMaxDayPickerHeight,
@@ -751,7 +755,7 @@ class _MonthPickerState extends State<MonthPicker> with SingleTickerProviderStat
                   scrollDirection: Axis.horizontal,
                   itemCount: _monthDelta(widget.firstDate, widget.lastDate) + 1,
                   itemBuilder: _buildItems,
-                  onPageChanged: _handleMonthPageChanged,
+                  onPageChanged: _handleMonthPageChanged, //FIXME: this callback is called too soon causing setState() to conflict with page change animation
                 ),
               ),
             ),
@@ -797,6 +801,7 @@ class _MonthPickerState extends State<MonthPicker> with SingleTickerProviderStat
 
   @override
   void dispose() {
+    print('--------dispose()--------');
     _timer?.cancel();
     _dayPickerController.dispose();
     super.dispose();
