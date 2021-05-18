@@ -720,6 +720,11 @@ class _MonthPickerState extends State<MonthPicker> with SingleTickerProviderStat
       // otherwise there'll be a bug where the page "snaps" back to previous state
       // after just briefly started animating forward/backward
       // -- there must be something wrong, this is just a workaround, FIXME
+
+      // UPDATE - so these attributes (`_previousMonthDate`...) does not belong to this widget
+      // they should be inside the children (PositionedDirectional) widgets
+      // we could use a StateBuilder to move them down
+      // and drop this callback method, dayPickerController should only be created once
       _dayPickerController = new PageController(initialPage: monthPage);
       _previousMonthDate = _addMonthsToMonthDate(widget.firstDate, monthPage - 1);
       _currentDisplayedMonthDate = _addMonthsToMonthDate(widget.firstDate, monthPage);
