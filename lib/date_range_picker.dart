@@ -11,6 +11,7 @@ library date_range_picker;
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -593,18 +594,18 @@ class MonthPicker extends StatefulWidget {
 }
 
 class _MonthPickerState extends State<MonthPicker> with SingleTickerProviderStateMixin {
+  late PageController _dayPickerController;
+  late ValueNotifier<int> _monthPage = ValueNotifier(0);
+
   @override
   void initState() {
     super.initState();
-    // Initially display the pre-selected date.
-    int monthPage;
     if (widget.selectedLastDate == null) {
-      monthPage = _monthDelta(widget.firstDate, widget.selectedFirstDate);
+      _monthPage = ValueNotifier(_monthDelta(widget.firstDate, widget.selectedFirstDate));
     } else {
-      monthPage = _monthDelta(widget.firstDate, widget.selectedLastDate!);
+      _monthPage = ValueNotifier(_monthDelta(widget.firstDate, widget.selectedLastDate!));
     }
-    _dayPickerController = new PageController(initialPage: monthPage);
-    _handleMonthPageChanged(monthPage);
+    _dayPickerController = new PageController(initialPage: _monthPage.value);
     _updateCurrentDate();
 
     // Setup the fade animation for chevrons
@@ -619,30 +620,15 @@ class _MonthPickerState extends State<MonthPicker> with SingleTickerProviderStat
   @override
   void didUpdateWidget(MonthPicker oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.selectedLastDate == null) {
-      final int monthPage = _monthDelta(widget.firstDate, widget.selectedFirstDate);
-      _handleMonthPageChanged(monthPage);
-    } else if (oldWidget.selectedLastDate == null ||
-        widget.selectedLastDate != oldWidget.selectedLastDate) {
-      final int monthPage = _monthDelta(widget.firstDate, widget.selectedLastDate!);
-      _handleMonthPageChanged(monthPage);
-    }
-  }
-
-  late MaterialLocalizations localizations;
-  late TextDirection textDirection;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    localizations = MaterialLocalizations.of(context);
-    textDirection = Directionality.of(context);
+    // 'Align' the controller with current page index (_monthPage.value) upon refresh.
+    // This is needed for when this is rebuilt by parent (user selecting a day from DatePicker),
+    // PageViewer.builder() won't 'snap' it back to original initialPage
+    _dayPickerController.dispose();
+    _dayPickerController = new PageController(initialPage: _monthPage.value);
   }
 
   late DateTime _todayDate;
-  DateTime? _currentDisplayedMonthDate;
   Timer? _timer;
-  late PageController _dayPickerController;
   late AnimationController _chevronOpacityController;
   late Animation<double> _chevronOpacityAnimation;
 
@@ -683,55 +669,6 @@ class _MonthPickerState extends State<MonthPicker> with SingleTickerProviderStat
     );
   }
 
-  void _handleNextMonth() {
-    if (!_isDisplayingLastMonth && _nextMonthDate != null) {
-      SemanticsService.announce(localizations.formatMonthYear(_nextMonthDate!), textDirection);
-      _dayPickerController.nextPage(duration: _kMonthScrollDuration, curve: Curves.ease);
-    }
-  }
-
-  void _handlePreviousMonth() {
-    if (!_isDisplayingFirstMonth && _previousMonthDate != null) {
-      SemanticsService.announce(localizations.formatMonthYear(_previousMonthDate!), textDirection);
-      _dayPickerController.previousPage(duration: _kMonthScrollDuration, curve: Curves.ease);
-    }
-  }
-
-  /// True if the earliest allowable month is displayed.
-  bool get _isDisplayingFirstMonth {
-    return !(_currentDisplayedMonthDate
-            ?.isAfter(new DateTime(widget.firstDate.year, widget.firstDate.month)) ??
-        false);
-  }
-
-  /// True if the latest allowable month is displayed.
-  bool get _isDisplayingLastMonth {
-    return !(_currentDisplayedMonthDate
-            ?.isBefore(new DateTime(widget.lastDate.year, widget.lastDate.month)) ??
-        false);
-  }
-
-  DateTime? _previousMonthDate;
-  DateTime? _nextMonthDate;
-
-  void _handleMonthPageChanged(int monthPage) {
-    setState(() {
-      // update the controller to keep up with current page's setting
-      // otherwise there'll be a bug where the page "snaps" back to previous state
-      // after just briefly started animating forward/backward
-      // -- there must be something wrong, this is just a workaround, FIXME
-
-      // UPDATE - so these attributes (`_previousMonthDate`...) does not belong to this widget
-      // they should be inside the children (PositionedDirectional) widgets
-      // we could use a StateBuilder to move them down
-      // and drop this callback method, dayPickerController should only be created once
-      _dayPickerController = new PageController(initialPage: monthPage);
-      _previousMonthDate = _addMonthsToMonthDate(widget.firstDate, monthPage - 1);
-      _currentDisplayedMonthDate = _addMonthsToMonthDate(widget.firstDate, monthPage);
-      _nextMonthDate = _addMonthsToMonthDate(widget.firstDate, monthPage + 1);
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return new SizedBox(
@@ -759,44 +696,26 @@ class _MonthPickerState extends State<MonthPicker> with SingleTickerProviderStat
                   scrollDirection: Axis.horizontal,
                   itemCount: _monthDelta(widget.firstDate, widget.lastDate) + 1,
                   itemBuilder: _buildItems,
-                  onPageChanged: _handleMonthPageChanged,
+                  onPageChanged: (newMonthPage) {
+                    _monthPage.value = newMonthPage;
+                  },
                 ),
               ),
             ),
           ),
-          new PositionedDirectional(
-            top: 0.0,
-            start: 8.0,
-            child: new Semantics(
-              sortKey: _MonthPickerSortKey.previousMonth,
-              child: new FadeTransition(
-                opacity: _chevronOpacityAnimation,
-                child: new IconButton(
-                  icon: const Icon(Icons.chevron_left),
-                  tooltip: _isDisplayingFirstMonth || _previousMonthDate == null
-                      ? null
-                      : '${localizations.previousMonthTooltip} ${localizations.formatMonthYear(_previousMonthDate!)}',
-                  onPressed: _isDisplayingFirstMonth ? null : _handlePreviousMonth,
-                ),
-              ),
-            ),
+          new _ChevronLeftArrow(
+            dayPickerController: _dayPickerController,
+            chevronOpacityAnimation: _chevronOpacityAnimation,
+            firstDate: widget.firstDate,
+            lastDate: widget.lastDate,
+            monthPageListenable: _monthPage,
           ),
-          new PositionedDirectional(
-            top: 0.0,
-            end: 8.0,
-            child: new Semantics(
-              sortKey: _MonthPickerSortKey.nextMonth,
-              child: new FadeTransition(
-                opacity: _chevronOpacityAnimation,
-                child: new IconButton(
-                  icon: const Icon(Icons.chevron_right),
-                  tooltip: _isDisplayingLastMonth || _nextMonthDate == null
-                      ? null
-                      : '${localizations.nextMonthTooltip} ${localizations.formatMonthYear(_nextMonthDate!)}',
-                  onPressed: _isDisplayingLastMonth ? null : _handleNextMonth,
-                ),
-              ),
-            ),
+          new _ChevronRightArrow(
+            dayPickerController: _dayPickerController,
+            chevronOpacityAnimation: _chevronOpacityAnimation,
+            firstDate: widget.firstDate,
+            lastDate: widget.lastDate,
+            monthPageListenable: _monthPage,
           ),
         ],
       ),
@@ -806,8 +725,143 @@ class _MonthPickerState extends State<MonthPicker> with SingleTickerProviderStat
   @override
   void dispose() {
     _timer?.cancel();
+    _monthPage.dispose();
     _dayPickerController.dispose();
     super.dispose();
+  }
+}
+
+class _ChevronLeftArrow extends StatelessWidget {
+  final PageController dayPickerController;
+  final Animation<double> chevronOpacityAnimation;
+  final DateTime firstDate, lastDate;
+  final ValueListenable<int> monthPageListenable;
+
+  const _ChevronLeftArrow({
+    required this.dayPickerController,
+    required this.chevronOpacityAnimation,
+    required this.firstDate,
+    required this.lastDate,
+    required this.monthPageListenable,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final localizations = MaterialLocalizations.of(context);
+    final textDirection = Directionality.of(context);
+
+    return new PositionedDirectional(
+      top: 0.0,
+      start: 8.0,
+      child: new Semantics(
+        sortKey: _MonthPickerSortKey.previousMonth,
+        child: new FadeTransition(
+          opacity: chevronOpacityAnimation,
+          child: ValueListenableBuilder(
+            valueListenable: monthPageListenable,
+            builder: (_, int currentMonthPage, __) {
+              final isDisplayingFirstMonth = currentMonthPage == 0;
+              final previousMonthDate = _addMonthsToMonthDate(firstDate, currentMonthPage - 1);
+
+              return new IconButton(
+                icon: const Icon(Icons.chevron_left),
+                tooltip: isDisplayingFirstMonth
+                    ? null
+                    : '${localizations.previousMonthTooltip} ${localizations.formatMonthYear(previousMonthDate)}',
+                onPressed: isDisplayingFirstMonth
+                    ? null
+                    : () => _handlePreviousMonth(previousMonthDate, localizations, textDirection),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Add months to a month truncated date.
+  DateTime _addMonthsToMonthDate(DateTime monthDate, int monthsToAdd) {
+    return new DateTime(monthDate.year + monthsToAdd ~/ 12, monthDate.month + monthsToAdd % 12);
+  }
+
+  void _handlePreviousMonth(
+    DateTime previousMonthDate,
+    MaterialLocalizations localizations,
+    TextDirection textDirection,
+  ) {
+    SemanticsService.announce(
+      localizations.formatMonthYear(previousMonthDate),
+      textDirection,
+    );
+    dayPickerController.previousPage(duration: _kMonthScrollDuration, curve: Curves.ease);
+  }
+}
+
+class _ChevronRightArrow extends StatelessWidget {
+  final PageController dayPickerController;
+  final Animation<double> chevronOpacityAnimation;
+  final DateTime firstDate, lastDate;
+  final ValueListenable<int> monthPageListenable;
+
+  const _ChevronRightArrow({
+    required this.dayPickerController,
+    required this.chevronOpacityAnimation,
+    required this.firstDate,
+    required this.lastDate,
+    required this.monthPageListenable,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final localizations = MaterialLocalizations.of(context);
+    final textDirection = Directionality.of(context);
+
+    return new PositionedDirectional(
+      top: 0.0,
+      end: 8.0,
+      child: new Semantics(
+        sortKey: _MonthPickerSortKey.nextMonth,
+        child: new FadeTransition(
+          opacity: chevronOpacityAnimation,
+          child: ValueListenableBuilder(
+            valueListenable: monthPageListenable,
+            builder: (_, int currentMonthPage, __) {
+              final currentDisplayedMonthDate = _addMonthsToMonthDate(firstDate, currentMonthPage);
+              final isDisplayingLastMonth =
+                  currentDisplayedMonthDate == new DateTime(lastDate.year, lastDate.month);
+              final nextMonthDate = _addMonthsToMonthDate(firstDate, currentMonthPage + 1);
+
+              return new IconButton(
+                icon: const Icon(Icons.chevron_right),
+                tooltip: isDisplayingLastMonth
+                    ? null
+                    : '${localizations.nextMonthTooltip} ${localizations.formatMonthYear(nextMonthDate)}',
+                onPressed: isDisplayingLastMonth
+                    ? null
+                    : () => _handleNextMonth(nextMonthDate, localizations, textDirection),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Add months to a month truncated date.
+  DateTime _addMonthsToMonthDate(DateTime monthDate, int monthsToAdd) {
+    return new DateTime(monthDate.year + monthsToAdd ~/ 12, monthDate.month + monthsToAdd % 12);
+  }
+
+  void _handleNextMonth(
+    DateTime nextMonthDate,
+    MaterialLocalizations localizations,
+    TextDirection textDirection,
+  ) {
+    SemanticsService.announce(
+      localizations.formatMonthYear(nextMonthDate),
+      textDirection,
+    );
+    dayPickerController.nextPage(duration: _kMonthScrollDuration, curve: Curves.ease);
   }
 }
 

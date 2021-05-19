@@ -20,8 +20,8 @@ class ExampleApp extends StatelessWidget {
                   context: context,
                   initialFirstDate: new DateTime.now(),
                   initialLastDate: (new DateTime.now()).add(new Duration(days: 7)),
-                  firstDate: new DateTime(2021, 4, 1),
-                  lastDate: new DateTime(2021, 5, 30));
+                  firstDate: new DateTime(2021, 1, 1),
+                  lastDate: new DateTime(2025, 1, 1));
               if (picked != null && picked.length == 2) {
                 print(picked);
               }
