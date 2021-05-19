@@ -2,10 +2,11 @@
    <img alt="Awesome Flutter" src="https://img.shields.io/badge/Awesome-Flutter-blue.svg?longCache=true&style=flat-square"/>
 </a> <a href="https://pub.dartlang.org/packages/date_range_picker"><img alt="pub version" src="https://img.shields.io/pub/v/date_range_picker.svg?style=flat-square"></a>
 
-# [Deprecated] Date Range Picker
+# [Un-Deprecated] Date Range Picker
 
-Currently Flutter has supported date range picker, so I think my mission is done. Thanks for using my lib.
-Link: https://api.flutter.dev/flutter/material/showDateRangePicker.html
+Original author has abandoned this project
+
+But I keep it up-to-date here
 
 ## Demo
 
@@ -22,7 +23,7 @@ Add to `pubspec.yaml` in `dependencies`
 ```
 
 ### Usage
-```
+```dart
 import 'package:date_range_picker/date_range_picker.dart' as DateRagePicker;
 ...
 new MaterialButton(
@@ -46,7 +47,7 @@ new MaterialButton(
 
 To change the colors to your preferred ones, you can wrap it in a Theme and a builder.
 
-```
+```dart
 Theme(
     data: Theme.of(context).copyWith(
         accentColor: Colors.green,
