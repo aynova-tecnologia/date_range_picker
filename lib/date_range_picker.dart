@@ -1147,11 +1147,11 @@ class _DatePickerDialogState extends State<_DatePickerDialog> {
     );
     final Widget actions = new ButtonBar(
       children: <Widget>[
-        new ElevatedButton(
+        new TextButton(
           child: new Text(localizations.cancelButtonLabel),
           onPressed: _handleCancel,
         ),
-        new ElevatedButton(
+        new TextButton(
           child: new Text(localizations.okButtonLabel),
           onPressed: _handleOk,
         ),
